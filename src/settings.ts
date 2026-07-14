@@ -37,13 +37,26 @@ const listeners = new Set<() => void>();
 let current: AppSettings = load();
 
 function load(): AppSettings {
+  let merged = { ...DEFAULT_SETTINGS };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    if (raw) merged = { ...merged, ...JSON.parse(raw) };
   } catch {
     /* corrupted settings fall back to defaults */
   }
-  return { ...DEFAULT_SETTINGS };
+  // Build-time defaults (e.g. from .env.local or the host's env vars) fill
+  // empty keys so a personal deploy comes pre-configured; anything the user
+  // typed in Settings wins.
+  if (!merged.llmApiKey && import.meta.env.VITE_DEFAULT_LLM_API_KEY) {
+    merged.llmApiKey = String(import.meta.env.VITE_DEFAULT_LLM_API_KEY);
+  }
+  if (import.meta.env.VITE_DEFAULT_LLM_MODEL && merged.llmModel === DEFAULT_SETTINGS.llmModel) {
+    merged.llmModel = String(import.meta.env.VITE_DEFAULT_LLM_MODEL);
+  }
+  if (!merged.sttApiKey && import.meta.env.VITE_DEFAULT_STT_API_KEY) {
+    merged.sttApiKey = String(import.meta.env.VITE_DEFAULT_STT_API_KEY);
+  }
+  return merged;
 }
 
 export function getSettings(): AppSettings {

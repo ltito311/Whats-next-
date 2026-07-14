@@ -3,4 +3,6 @@ dist/
 dist-demo/
 dev-dist/
 *.log
+.env
+.env.*
 .DS_Store

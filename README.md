@@ -53,6 +53,22 @@ Pages). HTTPS is required for microphone access and PWA install.
 3. Tell the AI about your business under **Settings → About you** so
    revenue-impact scoring matches reality.
 
+#### Baking keys into your own deploy (optional)
+
+For a personal deploy you can pre-fill keys at build time instead of pasting
+them in Settings — create a `.env.local` (gitignored) or set env vars on your
+host (Vercel/Netlify → project env vars):
+
+```bash
+VITE_DEFAULT_LLM_API_KEY=sk-or-…   # pre-fills the AI brain key
+VITE_DEFAULT_LLM_MODEL=…           # optional model override
+VITE_DEFAULT_STT_API_KEY=…         # pre-fills the cloud transcription key
+```
+
+⚠️ Anything baked in at build time ends up readable in the served JS bundle.
+Fine for a private personal URL, but set a spend limit on the key, and never
+commit `.env.local`.
+
 ## Stack
 
 React 19 + TypeScript + Vite, Dexie (IndexedDB), `@huggingface/transformers`
