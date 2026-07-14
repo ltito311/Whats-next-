@@ -6,8 +6,16 @@ import './styles/global.css';
 
 registerSW({ immediate: true });
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>
-);
+async function bootstrap() {
+  if (import.meta.env.VITE_DEMO === '1') {
+    const { seedDemo } = await import('./demo/seed');
+    await seedDemo();
+  }
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>
+  );
+}
+
+void bootstrap();

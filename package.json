@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:demo": "vite build --config vite.config.demo.ts",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -21,6 +22,7 @@
     "@vitejs/plugin-react": "^4.6.0",
     "typescript": "~5.8.3",
     "vite": "^7.0.0",
-    "vite-plugin-pwa": "^1.0.1"
+    "vite-plugin-pwa": "^1.0.1",
+    "vite-plugin-singlefile": "^2.3.3"
   }
 }
