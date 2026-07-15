@@ -66,7 +66,7 @@ jobs:
               '{type:"web_service", name:$name, ownerId:$owner, repo:$repo, branch:$branch,
                 autoDeploy:"no", envVars:$envVars,
                 serviceDetails:{runtime:"node", plan:"free", region:"oregon",
-                  envSpecificDetails:{buildCommand:"", startCommand:"node server.js"}}}')
+                  envSpecificDetails:{buildCommand:"echo no build step", startCommand:"node server.js"}}}')
             RESP=$(curl -s "${auth[@]}" -X POST "$RENDER_API/services" -d "$CREATE")
             SID=$(echo "$RESP" | jq -r '.service.id // empty')
             if [ -z "$SID" ]; then
