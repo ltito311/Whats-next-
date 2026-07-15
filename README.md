@@ -1,99 +1,77 @@
 # What's Next
 
-A personal task management app with a built-in **voice + text AI agent** that
-manages your board for you. Talk to it ("add buy groceries for tomorrow, high
-priority, and clear everything I've finished") and it makes the changes.
+**Voice brain dumps → actionable tasks, notes and ideas.**
 
-- **Zero dependencies** — plain Node.js, nothing to `npm install`.
-- **Voice input is free** — transcription uses the browser's built-in
-  Web Speech API (Chrome / Edge / Safari). Hit the mic, talk, watch it
-  transcribe live, then hit ✔ to send.
-- **Bring any cheap model** — works with any OpenAI-compatible API.
-  Presets included for DeepSeek, GLM (Zhipu), Kimi (Moonshot), and Qwen.
-- **Two chat modes** — ⚡ Tasks (do what I said) and 💭 Brainstorm
-  (thinking partner: untangle a rambly voice note into a plan, then put
-  it on the board when you say go). ☀️ gives you a morning kickoff that
-  ranks your day by your standing priorities (🎯 focus note).
-- **Your data lives on your device** — tasks, chat history, and focus
-  note persist in the browser (localStorage). The server is stateless,
-  so redeploys never wipe anything.
-- **Installable PWA** — add it to your phone home screen; a network-first
-  service worker means every reopen shows the latest deployed version.
+Hit record, ramble as long as you like. What's Next transcribes it, then an AI
+sorts the ramble into:
 
-## Quick start
+- **Tasks** — rewritten as concrete next steps, scored by revenue impact ($–$$$),
+  prioritized, and linked to your goals
+- **Notes** — decisions and things to remember
+- **Ideas** — creative sparks, clustered by theme in a visual **Mind** map
+
+Everything is stored **on your device** (IndexedDB). No backend, no account.
+
+## Features
+
+- 🎙️ **Capture** — one-tap voice recording, or type a dump instead
+- 📴 **Offline-first PWA** — install it on your phone; recording always works,
+  queued dumps process automatically when you're back online
+- 🧠 **On-device Whisper** — free, private transcription in the browser
+  (first use downloads the model, ~40–250 MB depending on size, then cached
+  for offline use). Optional cloud transcription (any OpenAI-compatible
+  `/audio/transcriptions` endpoint, e.g. Groq) for speed
+- 🤖 **Bring your own AI** — task extraction runs on any OpenAI-compatible
+  chat API: OpenRouter, DeepSeek, Groq, a local server. Keys live only in
+  your browser
+- 🎯 **Goals** — define revenue goals; extracted tasks get linked and the list
+  sorts by what moves the needle
+- ✨ **Mind view** — your notes and ideas clustered by theme as a glowing map
+- 🌗 **Two themes** — premium dark with glowing accents (default) and pastel
+  light glassmorphism
+
+## Getting started
 
 ```bash
-cp .env.example .env      # then paste your API key into it
-node server.js            # requires Node 18+
+npm install
+npm run dev      # local dev server
+npm run build    # production build to dist/
+npm run preview  # serve the production build
 ```
 
-Open http://localhost:3000 in Chrome (best voice support).
+Deploy `dist/` to any static host (Netlify, Vercel, Cloudflare Pages, GitHub
+Pages). HTTPS is required for microphone access and PWA install.
 
-## Getting an API key (the only thing you need)
+### Hooking up AI
 
-Pick one — they all work the same way as Claude's API: sign up, create a
-key, paste it into `.env`.
+1. Open **Settings → AI brain**, paste an API key
+   (e.g. an [OpenRouter](https://openrouter.ai) key) and pick a cheap model —
+   DeepSeek/Qwen/GLM class models handle extraction well for pennies.
+2. Optionally add a cloud transcription key under **Settings → Transcription**
+   (Groq's `whisper-large-v3-turbo` is fast and nearly free). Without one,
+   transcription runs on-device.
+3. Tell the AI about your business under **Settings → About you** so
+   revenue-impact scoring matches reality.
 
-| Provider | Model | Cost | Where |
-|---|---|---|---|
-| **DeepSeek** (recommended) | `deepseek-chat` | ~$0.27 / M input tokens, ~$2 min top-up | [platform.deepseek.com](https://platform.deepseek.com) |
-| **GLM / Zhipu** | `glm-4-flash` | **Free tier** | [open.bigmodel.cn](https://open.bigmodel.cn) |
-| **Kimi / Moonshot** | `kimi-k2-0905-preview` | Cheap, strong agentic model | [platform.moonshot.cn](https://platform.moonshot.cn) |
-| **Qwen / Alibaba** | `qwen-plus` | Cheap, free trial credits | [dashscope.aliyuncs.com](https://dashscope.aliyuncs.com) |
+#### Baking keys into your own deploy (optional)
 
-Set `PROVIDER=deepseek` (or `glm`, `kimi`, `qwen`) and `PROVIDER_API_KEY=...`
-in `.env`. To use anything else (OpenRouter, SiliconFlow, a local model via
-Ollama/LM Studio), set `PROVIDER_BASE_URL` and `PROVIDER_MODEL` directly.
+For a personal deploy you can pre-fill keys at build time instead of pasting
+them in Settings — create a `.env.local` (gitignored) or set env vars on your
+host (Vercel/Netlify → project env vars):
 
-## Put it on your phone (free, auto-updates on every push)
-
-1. **Host it on Render (free):** go to [render.com](https://render.com),
-   sign in with GitHub, click **New + → Blueprint**, and pick this repo —
-   `render.yaml` configures everything. When prompted, paste your
-   `PROVIDER_API_KEY`. (Or use **New + → Web Service** manually: start
-   command `node server.js`, free plan, add the env var.)
-2. **Auto-deploy is on by default:** every `git push` to the connected
-   branch redeploys within a couple of minutes.
-3. **Install on iPhone:** open your Render URL in Safari → Share →
-   **Add to Home Screen**. Because data lives on the device and the
-   service worker is network-first, reopening the app after a push shows
-   the new version — nothing else to do.
-
-Notes:
-- The free tier sleeps after ~15 min idle; the first open afterwards takes
-  ~30–60 s to wake. Your tasks and chat are already on-device, so the board
-  shows instantly — only the AI needs the server awake.
-- Voice note for iOS: the in-app 🎤 uses Safari speech recognition, which
-  can be unavailable inside home-screen apps on older iOS versions. If so,
-  just tap the text box and use the keyboard's built-in dictation mic —
-  same result.
-
-## Render MCP (let the AI manage hosting)
-
-`.mcp.json` configures [Render's MCP server](https://mcp.render.com/mcp) so
-Claude Code sessions in this repo can create services, read deploy logs, and
-manage env vars on Render directly. To activate it:
-
-1. Create an API key: [dashboard.render.com](https://dashboard.render.com)
-   → Account Settings → API Keys.
-2. Add it as a `RENDER_API_KEY` secret in your Claude Code environment
-   settings (and, if the environment uses an allowlist network policy,
-   allow `mcp.render.com` and `api.render.com`).
-
-## How it works
-
-```
-You 🎤 → browser transcribes (free) → ✔ send
-      → server → cheap model w/ tool-calling → add/update/delete tasks
-      → reply + refreshed board
+```bash
+VITE_DEFAULT_LLM_API_KEY=sk-or-…   # pre-fills the AI brain key
+VITE_DEFAULT_LLM_MODEL=…           # optional model override
+VITE_DEFAULT_STT_API_KEY=…         # pre-fills the cloud transcription key
 ```
 
-The server (`server.js`) exposes the task board as **tools** (`add_task`,
-`update_task`, `delete_task`, `list_tasks`, `clear_completed`, `set_focus`)
-and runs an agent loop: the browser sends its tasks + focus note with each
-message, the model decides which tools to call, the server applies them to
-that state and returns it, and the browser persists the result. One spoken
-sentence can trigger many actions.
+⚠️ Anything baked in at build time ends up readable in the served JS bundle.
+Fine for a private personal URL, but set a spend limit on the key, and never
+commit `.env.local`.
 
-You can also use the board directly — quick-add box, checkboxes, delete
-buttons — no AI required.
+## Stack
+
+React 19 + TypeScript + Vite, Dexie (IndexedDB), `@huggingface/transformers`
+(in-browser Whisper via a web worker), `vite-plugin-pwa` (service worker +
+offline caching, including model weights). No UI framework — hand-rolled
+glassmorphism design system in `src/styles/global.css`.
