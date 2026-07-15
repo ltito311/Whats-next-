@@ -26,8 +26,22 @@ jobs:
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           PROVIDER_API_KEY: ${{ secrets.PROVIDER_API_KEY }}
+          # Fallbacks: user-named secrets; sorted by value prefix below.
+          ALT1: ${{ secrets.YOLO }}
+          ALT2: ${{ secrets.YESE }}
+          ALT3: ${{ secrets.YES }}
         run: |
           set -euo pipefail
+          # A Render API key always starts with rnd_ — find it whatever the
+          # secret is named. Any other non-empty candidate is treated as the
+          # model provider key (DeepSeek keys start with sk-).
+          for v in "$ALT1" "$ALT2" "$ALT3"; do
+            [ -z "$v" ] && continue
+            case "$v" in
+              rnd_*) RENDER_API_KEY="$v" ;;
+              *) [ -z "$PROVIDER_API_KEY" ] && PROVIDER_API_KEY="$v" ;;
+            esac
+          done
           if [ -z "$RENDER_API_KEY" ]; then
             echo "RENDER_API_KEY secret not set yet — skipping. Add it at $REPO_URL/settings/secrets/actions (name: RENDER_API_KEY)."
             exit 0
