@@ -10,6 +10,15 @@ priority, and clear everything I've finished") and it makes the changes.
   transcribe live, then hit ✔ to send.
 - **Bring any cheap model** — works with any OpenAI-compatible API.
   Presets included for DeepSeek, GLM (Zhipu), Kimi (Moonshot), and Qwen.
+- **Two chat modes** — ⚡ Tasks (do what I said) and 💭 Brainstorm
+  (thinking partner: untangle a rambly voice note into a plan, then put
+  it on the board when you say go). ☀️ gives you a morning kickoff that
+  ranks your day by your standing priorities (🎯 focus note).
+- **Your data lives on your device** — tasks, chat history, and focus
+  note persist in the browser (localStorage). The server is stateless,
+  so redeploys never wipe anything.
+- **Installable PWA** — add it to your phone home screen; a network-first
+  service worker means every reopen shows the latest deployed version.
 
 ## Quick start
 
@@ -36,6 +45,29 @@ Set `PROVIDER=deepseek` (or `glm`, `kimi`, `qwen`) and `PROVIDER_API_KEY=...`
 in `.env`. To use anything else (OpenRouter, SiliconFlow, a local model via
 Ollama/LM Studio), set `PROVIDER_BASE_URL` and `PROVIDER_MODEL` directly.
 
+## Put it on your phone (free, auto-updates on every push)
+
+1. **Host it on Render (free):** go to [render.com](https://render.com),
+   sign in with GitHub, click **New + → Blueprint**, and pick this repo —
+   `render.yaml` configures everything. When prompted, paste your
+   `PROVIDER_API_KEY`. (Or use **New + → Web Service** manually: start
+   command `node server.js`, free plan, add the env var.)
+2. **Auto-deploy is on by default:** every `git push` to the connected
+   branch redeploys within a couple of minutes.
+3. **Install on iPhone:** open your Render URL in Safari → Share →
+   **Add to Home Screen**. Because data lives on the device and the
+   service worker is network-first, reopening the app after a push shows
+   the new version — nothing else to do.
+
+Notes:
+- The free tier sleeps after ~15 min idle; the first open afterwards takes
+  ~30–60 s to wake. Your tasks and chat are already on-device, so the board
+  shows instantly — only the AI needs the server awake.
+- Voice note for iOS: the in-app 🎤 uses Safari speech recognition, which
+  can be unavailable inside home-screen apps on older iOS versions. If so,
+  just tap the text box and use the keyboard's built-in dictation mic —
+  same result.
+
 ## How it works
 
 ```
@@ -45,9 +77,10 @@ You 🎤 → browser transcribes (free) → ✔ send
 ```
 
 The server (`server.js`) exposes the task board as **tools** (`add_task`,
-`update_task`, `delete_task`, `list_tasks`, `clear_completed`) and runs an
-agent loop: the model decides which tools to call, the server executes them
-against `data/tasks.json`, and the model replies with a summary. One spoken
+`update_task`, `delete_task`, `list_tasks`, `clear_completed`, `set_focus`)
+and runs an agent loop: the browser sends its tasks + focus note with each
+message, the model decides which tools to call, the server applies them to
+that state and returns it, and the browser persists the result. One spoken
 sentence can trigger many actions.
 
 You can also use the board directly — quick-add box, checkboxes, delete

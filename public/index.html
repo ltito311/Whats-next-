@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>What's Next</title>
+  <meta name="theme-color" content="#0f1117" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="What's Next" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="icon" type="image/png" href="icon-192.png" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -15,6 +23,7 @@
           <input id="quick-add-input" type="text" placeholder="Quick add a task…" />
           <button type="submit">Add</button>
         </form>
+        <button id="focus-banner" class="focus-banner" hidden></button>
       </header>
       <ul id="task-list" class="task-list"></ul>
       <p id="empty-state" class="empty-state" hidden>
@@ -29,19 +38,15 @@
           <button id="mode-tasks" class="mode-btn active" title="Do-what-I-said mode: fast task execution">⚡ Tasks</button>
           <button id="mode-brainstorm" class="mode-btn" title="Thinking-partner mode: ramble, plan your day, untangle your workflow">💭 Brainstorm</button>
         </div>
-        <span id="model-badge" class="model-badge">…</span>
-      </header>
-      <div id="chat-log" class="chat-log">
-        <div class="msg assistant">
-          Hey! Two ways to use me: in ⚡ Tasks mode, tell me what to do —
-          "add buy groceries for tomorrow, high priority" — and I'll do it.
-          Flip to 💭 Brainstorm mode to just ramble about your day and I'll
-          help you turn it into a plan, then put it on the board when
-          you're ready.
+        <div class="header-actions">
+          <span id="model-badge" class="model-badge">…</span>
+          <button id="clear-chat-btn" class="tiny-btn" title="Clear conversation">🗑</button>
         </div>
-      </div>
+      </header>
+      <div id="chat-log" class="chat-log"></div>
       <div id="chat-error" class="chat-error" hidden></div>
       <footer class="chat-input">
+        <button id="plan-btn" class="icon-btn" title="Morning kickoff — plan my day from the board and my priorities">☀️</button>
         <button id="mic-btn" class="icon-btn" title="Hold a voice note — I'll transcribe it live">🎤</button>
         <textarea id="chat-text" rows="1" placeholder="Message the assistant…"></textarea>
         <button id="send-btn" class="icon-btn send" title="Send">✔</button>

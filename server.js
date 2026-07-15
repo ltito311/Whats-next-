@@ -4,8 +4,13 @@
  * Zero dependencies. Run with:  node server.js
  * Requires Node 18+ (built-in fetch).
  *
+ * The server is STATELESS: tasks, chat history, and the user's focus note
+ * live in the browser (localStorage) and are sent along with each chat
+ * request. That makes it safe to host on free tiers whose disks are wiped
+ * on every deploy — your data lives on your device and survives redeploys.
+ *
  * The agent talks to any OpenAI-compatible API (DeepSeek, GLM/Zhipu, Kimi/
- * Moonshot, Qwen, or even OpenAI/Anthropic-via-gateway). Configure in .env.
+ * Moonshot, Qwen, or anything via a gateway). Configure in .env or env vars.
  */
 
 const http = require("http");
@@ -40,32 +45,15 @@ const BASE_URL = process.env.PROVIDER_BASE_URL || preset.baseUrl;
 const MODEL = process.env.PROVIDER_MODEL || preset.model;
 const API_KEY = process.env.PROVIDER_API_KEY || "";
 
-// ---------- Task store (JSON file) ----------
-const DATA_DIR = path.join(__dirname, "data");
-const TASKS_FILE = path.join(DATA_DIR, "tasks.json");
-
-function loadTasks() {
-  try {
-    return JSON.parse(fs.readFileSync(TASKS_FILE, "utf8"));
-  } catch {
-    return [];
-  }
-}
-
-function saveTasks(tasks) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(TASKS_FILE, JSON.stringify(tasks, null, 2));
-}
-
-let nextId = loadTasks().reduce((m, t) => Math.max(m, t.id), 0) + 1;
-
 // ---------- Agent tools ----------
+// Tools operate on per-request state: { tasks: [...], profile: { focus } }.
+// Mutations are returned to the client, which persists them locally.
 const TOOL_DEFS = [
   {
     type: "function",
     function: {
       name: "list_tasks",
-      description: "List all tasks with their ids, titles, status, priority and due dates.",
+      description: "List all tasks with their ids, titles, status, priority and due dates, plus the user's standing focus note.",
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
@@ -125,16 +113,32 @@ const TOOL_DEFS = [
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "set_focus",
+      description:
+        "Save or replace the user's standing focus note — the kind of work that always comes first for them (e.g. 'app/region submissions before anything else'). Use whenever the user states or changes what matters most, so future day plans rank correctly.",
+      parameters: {
+        type: "object",
+        properties: {
+          focus: { type: "string", description: "The full focus note. Empty string clears it." },
+        },
+        required: ["focus"],
+      },
+    },
+  },
 ];
 
-function runTool(name, args) {
-  const tasks = loadTasks();
+function runTool(name, args, state) {
+  const { tasks, profile } = state;
   switch (name) {
     case "list_tasks":
-      return { tasks };
+      return { tasks, focus: profile.focus || "" };
     case "add_task": {
+      const nextId = tasks.reduce((m, t) => Math.max(m, t.id || 0), 0) + 1;
       const task = {
-        id: nextId++,
+        id: nextId,
         title: String(args.title || "").trim() || "Untitled",
         notes: args.notes || "",
         priority: ["low", "medium", "high"].includes(args.priority) ? args.priority : "medium",
@@ -143,7 +147,6 @@ function runTool(name, args) {
         createdAt: new Date().toISOString(),
       };
       tasks.push(task);
-      saveTasks(tasks);
       return { created: task };
     }
     case "update_task": {
@@ -154,21 +157,22 @@ function runTool(name, args) {
       if (["low", "medium", "high"].includes(args.priority)) task.priority = args.priority;
       if (typeof args.due === "string") task.due = args.due || null;
       if (typeof args.done === "boolean") task.done = args.done;
-      saveTasks(tasks);
       return { updated: task };
     }
     case "delete_task": {
       const idx = tasks.findIndex((t) => t.id === args.id);
       if (idx === -1) return { error: `No task with id ${args.id}` };
       const [removed] = tasks.splice(idx, 1);
-      saveTasks(tasks);
       return { deleted: removed };
     }
     case "clear_completed": {
-      const remaining = tasks.filter((t) => !t.done);
-      const removedCount = tasks.length - remaining.length;
-      saveTasks(remaining);
+      const removedCount = tasks.filter((t) => t.done).length;
+      state.tasks = tasks.filter((t) => !t.done);
       return { removedCount };
+    }
+    case "set_focus": {
+      profile.focus = String(args.focus || "").trim();
+      return { focus: profile.focus };
     }
     default:
       return { error: `Unknown tool: ${name}` };
@@ -178,17 +182,23 @@ function runTool(name, args) {
 // ---------- Agent loop ----------
 const TODAY = () => new Date().toISOString().slice(0, 10);
 
+function focusNote(profile) {
+  return profile.focus
+    ? `\n\nThe user's standing priorities (always apply these when ranking, planning, or suggesting what to do first): ${profile.focus}`
+    : "";
+}
+
 const PROMPTS = {
   // Fast, do-what-I-said mode.
-  tasks: () => `You are the assistant inside "What's Next", a personal task management app.
+  tasks: (profile) => `You are the assistant inside "What's Next", a personal task management app.
 You can manage the user's task board with the tools provided. Users often speak
 their requests aloud (voice transcription), so messages may be rambly — extract
 the intent and act on it. When the user asks for several things at once, make
 all the tool calls needed. After acting, reply with a short, friendly summary of
-what you did. Today's date is ${TODAY()}.`,
+what you did. Today's date is ${TODAY()}.${focusNote(profile)}`,
 
   // Thinking-partner mode.
-  brainstorm: () => `You are a sharp, warm thinking partner inside "What's Next",
+  brainstorm: (profile) => `You are a sharp, warm thinking partner inside "What's Next",
 a personal task management app. The user talks to you in rambly voice notes to
 untangle their day, their priorities, and their workflow. Your job:
 
@@ -206,14 +216,20 @@ untangle their day, their priorities, and their workflow. Your job:
    tools once the user agrees ("yeah do that", "add those") — then create the
    tasks with sensible priorities and due dates and confirm briefly. You can
    call list_tasks anytime to ground advice in what's actually on their plate.
+6. When asked to plan the day ("what's my day look like", "plan my day"), call
+   list_tasks first, then propose a concrete attack order: standing priorities
+   first, then due dates and task priority. Timebox each item and name one
+   thing to consciously skip today.
+7. When the user tells you what kind of work always matters most, save it with
+   set_focus so tomorrow's plan remembers.
 
 Keep replies conversational and reasonably short — this is a chat, not an
 essay. No bullet-point walls unless laying out a day plan. Today's date is
-${TODAY()}.`,
+${TODAY()}.${focusNote(profile)}`,
 };
 
-function systemPrompt(mode) {
-  return (PROMPTS[mode] || PROMPTS.tasks)();
+function systemPrompt(mode, profile) {
+  return (PROMPTS[mode] || PROMPTS.tasks)(profile);
 }
 
 async function chatCompletion(messages) {
@@ -232,8 +248,8 @@ async function chatCompletion(messages) {
   return res.json();
 }
 
-async function runAgent(history, mode) {
-  const messages = [{ role: "system", content: systemPrompt(mode) }, ...history];
+async function runAgent(history, mode, state) {
+  const messages = [{ role: "system", content: systemPrompt(mode, state.profile) }, ...history];
   const MAX_TURNS = 8;
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
@@ -254,7 +270,7 @@ async function runAgent(history, mode) {
       } catch {
         /* leave args empty */
       }
-      const result = runTool(call.function.name, args);
+      const result = runTool(call.function.name, args, state);
       messages.push({
         role: "tool",
         tool_call_id: call.id,
@@ -271,6 +287,7 @@ const MIME = {
   ".js": "text/javascript",
   ".css": "text/css",
   ".json": "application/json",
+  ".webmanifest": "application/manifest+json",
   ".svg": "image/svg+xml",
   ".png": "image/png",
   ".ico": "image/x-icon",
@@ -286,7 +303,7 @@ function readBody(req) {
     let body = "";
     req.on("data", (c) => {
       body += c;
-      if (body.length > 1e6) reject(new Error("Body too large"));
+      if (body.length > 2e6) reject(new Error("Body too large"));
     });
     req.on("end", () => resolve(body));
     req.on("error", reject);
@@ -297,27 +314,6 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   try {
-    // --- API routes ---
-    if (url.pathname === "/api/tasks" && req.method === "GET") {
-      return sendJSON(res, 200, { tasks: loadTasks() });
-    }
-
-    if (url.pathname === "/api/tasks" && req.method === "POST") {
-      const { title, notes, priority, due } = JSON.parse(await readBody(req));
-      return sendJSON(res, 200, runTool("add_task", { title, notes, priority, due }));
-    }
-
-    if (url.pathname.startsWith("/api/tasks/") && req.method === "PATCH") {
-      const id = parseInt(url.pathname.split("/")[3], 10);
-      const patch = JSON.parse(await readBody(req));
-      return sendJSON(res, 200, runTool("update_task", { ...patch, id }));
-    }
-
-    if (url.pathname.startsWith("/api/tasks/") && req.method === "DELETE") {
-      const id = parseInt(url.pathname.split("/")[3], 10);
-      return sendJSON(res, 200, runTool("delete_task", { id }));
-    }
-
     if (url.pathname === "/api/config" && req.method === "GET") {
       return sendJSON(res, 200, {
         model: MODEL,
@@ -330,16 +326,20 @@ const server = http.createServer(async (req, res) => {
       if (!API_KEY) {
         return sendJSON(res, 400, {
           error:
-            "No API key configured. Copy .env.example to .env and set PROVIDER_API_KEY. " +
+            "No API key configured. Set PROVIDER_API_KEY (in .env locally, or in your host's environment settings). " +
             "See the README for where to get a cheap (or free) key.",
         });
       }
-      const { messages, mode } = JSON.parse(await readBody(req));
+      const { messages, mode, tasks, profile } = JSON.parse(await readBody(req));
       if (!Array.isArray(messages) || messages.length === 0) {
         return sendJSON(res, 400, { error: "messages array required" });
       }
-      const reply = await runAgent(messages, mode);
-      return sendJSON(res, 200, { reply, tasks: loadTasks() });
+      const state = {
+        tasks: Array.isArray(tasks) ? tasks : [],
+        profile: profile && typeof profile === "object" ? profile : { focus: "" },
+      };
+      const reply = await runAgent(messages, mode, state);
+      return sendJSON(res, 200, { reply, tasks: state.tasks, profile: state.profile });
     }
 
     // --- Static files ---
@@ -350,7 +350,11 @@ const server = http.createServer(async (req, res) => {
       return res.end("Forbidden");
     }
     if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-      res.writeHead(200, { "Content-Type": MIME[path.extname(filePath)] || "application/octet-stream" });
+      res.writeHead(200, {
+        "Content-Type": MIME[path.extname(filePath)] || "application/octet-stream",
+        // Let the service worker (network-first) own freshness, not the HTTP cache.
+        "Cache-Control": "no-cache",
+      });
       return res.end(fs.readFileSync(filePath));
     }
     res.writeHead(404);
@@ -364,5 +368,5 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`What's Next running at http://localhost:${PORT}`);
   console.log(`Model: ${MODEL} @ ${BASE_URL}`);
-  console.log(API_KEY ? "API key: configured ✓" : "API key: MISSING — chat disabled until you set PROVIDER_API_KEY in .env");
+  console.log(API_KEY ? "API key: configured ✓" : "API key: MISSING — chat disabled until you set PROVIDER_API_KEY");
 });

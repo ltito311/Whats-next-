@@ -1,27 +1,55 @@
 // What's Next — frontend: task board + voice/text chat with the agent.
+// All data (tasks, chat history, focus note) persists in localStorage on
+// this device, so redeploys of the server never wipe anything.
 
 const taskList = document.getElementById("task-list");
 const emptyState = document.getElementById("empty-state");
 const quickAdd = document.getElementById("quick-add");
 const quickAddInput = document.getElementById("quick-add-input");
+const focusBanner = document.getElementById("focus-banner");
 const chatLog = document.getElementById("chat-log");
 const chatText = document.getElementById("chat-text");
 const sendBtn = document.getElementById("send-btn");
 const micBtn = document.getElementById("mic-btn");
+const planBtn = document.getElementById("plan-btn");
+const clearChatBtn = document.getElementById("clear-chat-btn");
 const micStatus = document.getElementById("mic-status");
 const chatError = document.getElementById("chat-error");
 const modelBadge = document.getElementById("model-badge");
 
-// Conversation history sent to the agent (user/assistant turns only).
-const history = [];
+// ---------- Local persistence ----------
+const store = {
+  load(key, fallback) {
+    try {
+      const v = JSON.parse(localStorage.getItem(key));
+      return v ?? fallback;
+    } catch {
+      return fallback;
+    }
+  },
+  save(key, val) {
+    localStorage.setItem(key, JSON.stringify(val));
+  },
+};
+
+let tasks = store.load("wn.tasks", []);
+let profile = store.load("wn.profile", { focus: "" });
+let history = store.load("wn.history", []);
+
+function persist() {
+  store.save("wn.tasks", tasks);
+  store.save("wn.profile", profile);
+  store.save("wn.history", history);
+}
 
 // ---------- Mode toggle (⚡ Tasks vs 💭 Brainstorm) ----------
-let mode = "tasks";
+let mode = store.load("wn.mode", "tasks");
 const modeTasksBtn = document.getElementById("mode-tasks");
 const modeBrainstormBtn = document.getElementById("mode-brainstorm");
 
 function setMode(next) {
   mode = next;
+  store.save("wn.mode", mode);
   modeTasksBtn.classList.toggle("active", mode === "tasks");
   modeBrainstormBtn.classList.toggle("active", mode === "brainstorm");
   chatText.placeholder =
@@ -33,13 +61,31 @@ modeTasksBtn.addEventListener("click", () => setMode("tasks"));
 modeBrainstormBtn.addEventListener("click", () => setMode("brainstorm"));
 
 // ---------- Task board ----------
-async function refreshTasks() {
-  const res = await fetch("/api/tasks");
-  const { tasks } = await res.json();
-  renderTasks(tasks);
+function nextTaskId() {
+  return tasks.reduce((m, t) => Math.max(m, t.id || 0), 0) + 1;
 }
 
-function renderTasks(tasks) {
+function renderFocus() {
+  if (profile.focus) {
+    focusBanner.textContent = `🎯 ${profile.focus}`;
+    focusBanner.title = "Your standing priorities — tap to edit. The assistant uses this when planning your day.";
+    focusBanner.hidden = false;
+  } else {
+    focusBanner.textContent = "🎯 Set your standing priorities (tap, or just tell the assistant)";
+    focusBanner.title = "Tap to set what always comes first for you.";
+    focusBanner.hidden = false;
+  }
+}
+
+focusBanner.addEventListener("click", () => {
+  const next = prompt("What kind of work always comes first for you?", profile.focus || "");
+  if (next === null) return;
+  profile.focus = next.trim();
+  persist();
+  renderFocus();
+});
+
+function renderTasks() {
   taskList.innerHTML = "";
   emptyState.hidden = tasks.length > 0;
 
@@ -51,13 +97,10 @@ function renderTasks(tasks) {
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.checked = t.done;
-    checkbox.addEventListener("change", async () => {
-      await fetch(`/api/tasks/${t.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ done: checkbox.checked }),
-      });
-      refreshTasks();
+    checkbox.addEventListener("change", () => {
+      t.done = checkbox.checked;
+      persist();
+      renderTasks();
     });
 
     const body = document.createElement("div");
@@ -85,9 +128,10 @@ function renderTasks(tasks) {
     del.className = "delete-btn";
     del.textContent = "✕";
     del.title = "Delete task";
-    del.addEventListener("click", async () => {
-      await fetch(`/api/tasks/${t.id}`, { method: "DELETE" });
-      refreshTasks();
+    del.addEventListener("click", () => {
+      tasks = tasks.filter((x) => x.id !== t.id);
+      persist();
+      renderTasks();
     });
 
     li.append(checkbox, body, pill, del);
@@ -95,20 +139,31 @@ function renderTasks(tasks) {
   }
 }
 
-quickAdd.addEventListener("submit", async (e) => {
+quickAdd.addEventListener("submit", (e) => {
   e.preventDefault();
   const title = quickAddInput.value.trim();
   if (!title) return;
   quickAddInput.value = "";
-  await fetch("/api/tasks", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title }),
+  tasks.push({
+    id: nextTaskId(),
+    title,
+    notes: "",
+    priority: "medium",
+    due: null,
+    done: false,
+    createdAt: new Date().toISOString(),
   });
-  refreshTasks();
+  persist();
+  renderTasks();
 });
 
 // ---------- Chat ----------
+const WELCOME =
+  "Hey! Two ways to use me: in ⚡ Tasks mode, tell me what to do — " +
+  '"add buy groceries for tomorrow, high priority" — and I\'ll do it. ' +
+  "Flip to 💭 Brainstorm to ramble about your day and turn it into a plan, " +
+  "or hit ☀️ for a morning kickoff.";
+
 function addMsg(role, text) {
   const div = document.createElement("div");
   div.className = `msg ${role}`;
@@ -118,13 +173,22 @@ function addMsg(role, text) {
   return div;
 }
 
+function renderChatLog() {
+  chatLog.innerHTML = "";
+  addMsg("assistant", WELCOME);
+  for (const m of history) addMsg(m.role === "user" ? "user" : "assistant", m.content);
+}
+
 function showError(text) {
   chatError.textContent = text;
   chatError.hidden = false;
 }
 
-async function sendMessage() {
-  const text = chatText.value.trim();
+// Cap what we send so long-running histories don't blow up token costs.
+const HISTORY_WINDOW = 40;
+
+async function sendMessage(overrideText) {
+  const text = (overrideText || chatText.value).trim();
   if (!text) return;
 
   stopListening();
@@ -134,6 +198,7 @@ async function sendMessage() {
 
   addMsg("user", text);
   history.push({ role: "user", content: text });
+  persist();
 
   const thinking = addMsg("assistant thinking", "Thinking…");
   sendBtn.disabled = true;
@@ -142,30 +207,41 @@ async function sendMessage() {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: history, mode }),
+      body: JSON.stringify({
+        messages: history.slice(-HISTORY_WINDOW),
+        mode,
+        tasks,
+        profile,
+      }),
     });
     const data = await res.json();
     thinking.remove();
 
     if (!res.ok) {
       history.pop();
+      persist();
       showError(data.error || `Request failed (${res.status})`);
       return;
     }
 
     addMsg("assistant", data.reply);
     history.push({ role: "assistant", content: data.reply });
-    if (data.tasks) renderTasks(data.tasks);
+    if (Array.isArray(data.tasks)) tasks = data.tasks;
+    if (data.profile && typeof data.profile === "object") profile = data.profile;
+    persist();
+    renderTasks();
+    renderFocus();
   } catch (err) {
     thinking.remove();
     history.pop();
+    persist();
     showError(`Could not reach the server: ${err.message}`);
   } finally {
     sendBtn.disabled = false;
   }
 }
 
-sendBtn.addEventListener("click", sendMessage);
+sendBtn.addEventListener("click", () => sendMessage());
 chatText.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) {
     e.preventDefault();
@@ -177,6 +253,21 @@ chatText.addEventListener("input", () => {
   chatText.style.height = Math.min(chatText.scrollHeight, 120) + "px";
 });
 
+// ☀️ Morning kickoff — always runs in brainstorm mode.
+planBtn.addEventListener("click", () => {
+  setMode("brainstorm");
+  sendMessage(
+    "Plan my day. Look at my board and my standing priorities, give me a concrete order of attack with rough timeboxes, and tell me one thing to skip today."
+  );
+});
+
+clearChatBtn.addEventListener("click", () => {
+  if (!confirm("Clear the whole conversation? Your tasks and focus note stay.")) return;
+  history = [];
+  persist();
+  renderChatLog();
+});
+
 // ---------- Voice input (Web Speech API — free, in-browser) ----------
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recognition = null;
@@ -185,7 +276,7 @@ let baseText = ""; // text already in the box before this recording session
 
 if (!SpeechRecognition) {
   micBtn.disabled = true;
-  micBtn.title = "Voice input needs Chrome, Edge, or Safari";
+  micBtn.title = "Voice input needs Chrome, Edge, or Safari. Tip: your phone keyboard's dictation mic works here too.";
 } else {
   recognition = new SpeechRecognition();
   recognition.continuous = true;
@@ -238,6 +329,11 @@ micBtn.addEventListener("click", () => {
   listening ? stopListening() : startListening();
 });
 
+// ---------- PWA service worker (network-first: reopen = latest version) ----------
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
+
 // ---------- Init ----------
 fetch("/api/config")
   .then((r) => r.json())
@@ -246,10 +342,13 @@ fetch("/api/config")
     modelBadge.title = cfg.baseUrl;
     if (!cfg.hasKey) {
       showError(
-        "No API key set — chat is disabled. Copy .env.example to .env, add your PROVIDER_API_KEY, and restart the server. See README for where to get a cheap or free key."
+        "No API key set — chat is disabled. Set PROVIDER_API_KEY in .env (local) or in your host's environment settings, then restart. See README for where to get a cheap or free key."
       );
     }
   })
   .catch(() => {});
 
-refreshTasks();
+setMode(mode);
+renderChatLog();
+renderTasks();
+renderFocus();

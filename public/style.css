@@ -68,6 +68,33 @@ body {
   cursor: pointer;
 }
 
+.focus-banner {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 16px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px dashed var(--border);
+  background: rgba(124, 92, 255, 0.08);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.focus-banner:hover { color: var(--text); border-color: var(--accent-2); }
+
+.header-actions { display: flex; align-items: center; gap: 6px; }
+
+.tiny-btn {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 2px;
+}
+.tiny-btn:hover { color: var(--danger); }
+
 .task-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
 
 .task {
