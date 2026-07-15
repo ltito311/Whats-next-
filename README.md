@@ -68,6 +68,18 @@ Notes:
   just tap the text box and use the keyboard's built-in dictation mic —
   same result.
 
+## Render MCP (let the AI manage hosting)
+
+`.mcp.json` configures [Render's MCP server](https://mcp.render.com/mcp) so
+Claude Code sessions in this repo can create services, read deploy logs, and
+manage env vars on Render directly. To activate it:
+
+1. Create an API key: [dashboard.render.com](https://dashboard.render.com)
+   → Account Settings → API Keys.
+2. Add it as a `RENDER_API_KEY` secret in your Claude Code environment
+   settings (and, if the environment uses an allowlist network policy,
+   allow `mcp.render.com` and `api.render.com`).
+
 ## How it works
 
 ```
