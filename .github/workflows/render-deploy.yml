@@ -93,14 +93,25 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           # Wait for the deploy to go live.
+          LIVE=0
           for i in $(seq 1 40); do
             sleep 15
             STATUS=$(curl -sf "${auth[@]}" "$RENDER_API/services/$SID/deploys?limit=1" | jq -r '.[0].deploy.status')
             echo "deploy status: $STATUS"
             case "$STATUS" in
-              live) echo "DEPLOY LIVE: $URL"; exit 0 ;;
+              live) echo "DEPLOY LIVE: $URL"; LIVE=1; break ;;
               build_failed|update_failed|deactivated|canceled)
                 echo "::error::Deploy ended with status: $STATUS"; exit 1 ;;
             esac
           done
-          echo "::warning::Timed out waiting; check the Render dashboard."
+          [ "$LIVE" = 1 ] || { echo "::warning::Timed out waiting; check the Render dashboard."; exit 0; }
+
+          # Verify the public URL end-to-end from this runner.
+          echo "--- HTTP verification ---"
+          for p in / /api/config; do
+            CODE=$(curl -s -o /tmp/resp -w '%{http_code}' --max-time 90 "$URL$p" || echo fail)
+            echo "GET $p -> $CODE"
+            head -c 300 /tmp/resp; echo
+          done
+          echo "--- recent service events ---"
+          curl -sf "${auth[@]}" "$RENDER_API/services/$SID/events?limit=8" | jq -r '.[].event | "\(.timestamp) \(.type) \(.details.deployStatus // "")"' || true
