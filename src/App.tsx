@@ -1,17 +1,19 @@
 import { useEffect, useState, type ReactElement } from 'react';
 import { applyTheme, useSettings } from './settings';
 import { initPipeline } from './services/pipeline';
-import { CheckSquareIcon, GearIcon, MicIcon, NotesIcon, SparklesIcon } from './components/Icons';
+import { ChatIcon, CheckSquareIcon, GearIcon, MicIcon, NotesIcon, SparklesIcon } from './components/Icons';
 import CaptureView from './views/CaptureView';
+import CoachView from './views/CoachView';
 import TasksView from './views/TasksView';
 import MindView from './views/MindView';
 import NotesView from './views/NotesView';
 import SettingsView from './views/SettingsView';
 
-type Tab = 'capture' | 'tasks' | 'mind' | 'notes' | 'settings';
+type Tab = 'capture' | 'coach' | 'tasks' | 'mind' | 'notes' | 'settings';
 
 const TABS: { id: Tab; label: string; icon: (props: { size?: number }) => ReactElement }[] = [
   { id: 'capture', label: 'Capture', icon: MicIcon },
+  { id: 'coach', label: 'Coach', icon: ChatIcon },
   { id: 'tasks', label: 'Tasks', icon: CheckSquareIcon },
   { id: 'mind', label: 'Mind', icon: SparklesIcon },
   { id: 'notes', label: 'Notes', icon: NotesIcon },
@@ -58,6 +60,7 @@ export default function App() {
       </nav>
       <main className="view fade-in" key={tab}>
         {tab === 'capture' && <CaptureView />}
+        {tab === 'coach' && <CoachView />}
         {tab === 'tasks' && <TasksView />}
         {tab === 'mind' && <MindView />}
         {tab === 'notes' && <NotesView />}

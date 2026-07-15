@@ -872,3 +872,129 @@ audio {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
+
+/* ---------- Coach (chat) ---------- */
+
+.coach {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.coach-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.coach-banner {
+  padding: 12px 14px;
+  font-size: 13.5px;
+  color: var(--dim);
+  margin-bottom: 10px;
+}
+
+.coach-banner a {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.coach-banner.error {
+  color: var(--pink);
+  background: var(--pink-soft);
+  border-color: transparent;
+}
+
+.coach-log {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 2px 12px;
+}
+
+.coach-msg {
+  max-width: 86%;
+  padding: 11px 15px;
+  border-radius: 18px;
+  font-size: 14.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.coach-msg.user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-bottom-right-radius: 6px;
+  box-shadow: var(--glow);
+}
+
+.coach-msg.assistant {
+  align-self: flex-start;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 6px;
+}
+
+.coach-msg.thinking {
+  color: var(--dim);
+  font-style: italic;
+}
+
+.coach-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  align-self: flex-start;
+  padding-left: 2px;
+}
+
+.coach-note {
+  font-size: 12.5px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.coach-input {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.coach-input textarea {
+  flex: 1;
+  resize: none;
+  min-height: 42px;
+  max-height: 120px;
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  font-size: 14.5px;
+  font-family: inherit;
+}
+
+.coach-input .icon-btn.recording {
+  background: var(--pink-soft);
+  color: var(--pink);
+  animation: coach-pulse 1.2s infinite;
+}
+
+@keyframes coach-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--pink) 45%, transparent); }
+  70% { box-shadow: 0 0 0 10px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.coach-send {
+  padding: 11px 16px;
+}

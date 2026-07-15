@@ -60,6 +60,13 @@ export interface Goal {
   archived?: boolean;
 }
 
+export interface ChatMsg {
+  id?: number;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: number;
+}
+
 export const PRIORITIES: Priority[] = ['urgent', 'high', 'medium', 'low'];
 
 export const PRIORITY_RANK: Record<Priority, number> = {

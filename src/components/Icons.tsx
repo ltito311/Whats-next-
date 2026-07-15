@@ -26,6 +26,15 @@ export function MicIcon({ size, className }: IconProps) {
   );
 }
 
+export function ChatIcon({ size, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className}>
+      <path d="M20 12a8 8 0 1 0-14.6 4.5L4 20l3.7-1.2A8 8 0 0 0 20 12z" />
+      <path d="M8.5 10.5h7M8.5 13.5h4.5" />
+    </svg>
+  );
+}
+
 export function CheckSquareIcon({ size, className }: IconProps) {
   return (
     <svg {...base(size)} className={className}>
