@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>What's Next</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <main class="board">
+      <header class="board-header">
+        <h1>What's Next</h1>
+        <form id="quick-add" autocomplete="off">
+          <input id="quick-add-input" type="text" placeholder="Quick add a task…" />
+          <button type="submit">Add</button>
+        </form>
+      </header>
+      <ul id="task-list" class="task-list"></ul>
+      <p id="empty-state" class="empty-state" hidden>
+        Nothing here yet. Add a task above — or just tell the assistant what you need to do.
+      </p>
+    </main>
+
+    <aside class="chat">
+      <header class="chat-header">
+        <h2>Assistant</h2>
+        <span id="model-badge" class="model-badge">…</span>
+      </header>
+      <div id="chat-log" class="chat-log">
+        <div class="msg assistant">
+          Hey! I manage this board. Type or hit the mic and just talk —
+          "add buy groceries for tomorrow, high priority, and mark the
+          dentist thing done" — and I'll handle it.
+        </div>
+      </div>
+      <div id="chat-error" class="chat-error" hidden></div>
+      <footer class="chat-input">
+        <button id="mic-btn" class="icon-btn" title="Hold a voice note — I'll transcribe it live">🎤</button>
+        <textarea id="chat-text" rows="1" placeholder="Message the assistant…"></textarea>
+        <button id="send-btn" class="icon-btn send" title="Send">✔</button>
+      </footer>
+      <p id="mic-status" class="mic-status" hidden>Listening… speak freely, then hit ✔ to send.</p>
+    </aside>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
