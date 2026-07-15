@@ -176,12 +176,45 @@ function runTool(name, args) {
 }
 
 // ---------- Agent loop ----------
-const SYSTEM_PROMPT = `You are the assistant inside "What's Next", a personal task management app.
+const TODAY = () => new Date().toISOString().slice(0, 10);
+
+const PROMPTS = {
+  // Fast, do-what-I-said mode.
+  tasks: () => `You are the assistant inside "What's Next", a personal task management app.
 You can manage the user's task board with the tools provided. Users often speak
 their requests aloud (voice transcription), so messages may be rambly — extract
 the intent and act on it. When the user asks for several things at once, make
 all the tool calls needed. After acting, reply with a short, friendly summary of
-what you did. Today's date is ${new Date().toISOString().slice(0, 10)}.`;
+what you did. Today's date is ${TODAY()}.`,
+
+  // Thinking-partner mode.
+  brainstorm: () => `You are a sharp, warm thinking partner inside "What's Next",
+a personal task management app. The user talks to you in rambly voice notes to
+untangle their day, their priorities, and their workflow. Your job:
+
+1. LISTEN through the rambling and reflect back the 2-4 real threads you heard,
+   in plain words. Naming the mess is half the value.
+2. PUSH toward concrete: vague intentions ("be more efficient") become specific,
+   scheduled, finishable actions ("block 9-11am tomorrow for X, phone in the
+   other room"). Suggest timeboxes, an order of attack, and what to explicitly
+   NOT do today.
+3. COACH lightly on workflow: if you spot a recurring time sink or a pattern in
+   what they describe, say so and suggest one fix at a time — not a lecture.
+4. ASK at most one focused question per reply, and only when the answer would
+   change your advice. Otherwise give your best recommendation and commit to it.
+5. When a plan takes shape, offer to put it on the board. Only call the task
+   tools once the user agrees ("yeah do that", "add those") — then create the
+   tasks with sensible priorities and due dates and confirm briefly. You can
+   call list_tasks anytime to ground advice in what's actually on their plate.
+
+Keep replies conversational and reasonably short — this is a chat, not an
+essay. No bullet-point walls unless laying out a day plan. Today's date is
+${TODAY()}.`,
+};
+
+function systemPrompt(mode) {
+  return (PROMPTS[mode] || PROMPTS.tasks)();
+}
 
 async function chatCompletion(messages) {
   const res = await fetch(`${BASE_URL.replace(/\/$/, "")}/chat/completions`, {
@@ -199,8 +232,8 @@ async function chatCompletion(messages) {
   return res.json();
 }
 
-async function runAgent(history) {
-  const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...history];
+async function runAgent(history, mode) {
+  const messages = [{ role: "system", content: systemPrompt(mode) }, ...history];
   const MAX_TURNS = 8;
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
@@ -301,11 +334,11 @@ const server = http.createServer(async (req, res) => {
             "See the README for where to get a cheap (or free) key.",
         });
       }
-      const { messages } = JSON.parse(await readBody(req));
+      const { messages, mode } = JSON.parse(await readBody(req));
       if (!Array.isArray(messages) || messages.length === 0) {
         return sendJSON(res, 400, { error: "messages array required" });
       }
-      const reply = await runAgent(messages);
+      const reply = await runAgent(messages, mode);
       return sendJSON(res, 200, { reply, tasks: loadTasks() });
     }
 

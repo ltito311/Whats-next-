@@ -15,6 +15,23 @@ const modelBadge = document.getElementById("model-badge");
 // Conversation history sent to the agent (user/assistant turns only).
 const history = [];
 
+// ---------- Mode toggle (⚡ Tasks vs 💭 Brainstorm) ----------
+let mode = "tasks";
+const modeTasksBtn = document.getElementById("mode-tasks");
+const modeBrainstormBtn = document.getElementById("mode-brainstorm");
+
+function setMode(next) {
+  mode = next;
+  modeTasksBtn.classList.toggle("active", mode === "tasks");
+  modeBrainstormBtn.classList.toggle("active", mode === "brainstorm");
+  chatText.placeholder =
+    mode === "brainstorm"
+      ? "Ramble away — what's on your mind?"
+      : "Message the assistant…";
+}
+modeTasksBtn.addEventListener("click", () => setMode("tasks"));
+modeBrainstormBtn.addEventListener("click", () => setMode("brainstorm"));
+
 // ---------- Task board ----------
 async function refreshTasks() {
   const res = await fetch("/api/tasks");
@@ -125,7 +142,7 @@ async function sendMessage() {
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages: history }),
+      body: JSON.stringify({ messages: history, mode }),
     });
     const data = await res.json();
     thinking.remove();

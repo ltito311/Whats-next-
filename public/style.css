@@ -133,6 +133,32 @@ body {
 
 .chat-header h2 { font-size: 16px; }
 
+.mode-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px;
+}
+
+.mode-btn {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mode-btn.active {
+  background: var(--accent);
+  color: white;
+}
+
 .model-badge {
   font-size: 11px;
   color: var(--muted);

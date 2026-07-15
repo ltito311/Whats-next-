@@ -25,13 +25,19 @@
     <aside class="chat">
       <header class="chat-header">
         <h2>Assistant</h2>
+        <div class="mode-toggle" role="tablist">
+          <button id="mode-tasks" class="mode-btn active" title="Do-what-I-said mode: fast task execution">⚡ Tasks</button>
+          <button id="mode-brainstorm" class="mode-btn" title="Thinking-partner mode: ramble, plan your day, untangle your workflow">💭 Brainstorm</button>
+        </div>
         <span id="model-badge" class="model-badge">…</span>
       </header>
       <div id="chat-log" class="chat-log">
         <div class="msg assistant">
-          Hey! I manage this board. Type or hit the mic and just talk —
-          "add buy groceries for tomorrow, high priority, and mark the
-          dentist thing done" — and I'll handle it.
+          Hey! Two ways to use me: in ⚡ Tasks mode, tell me what to do —
+          "add buy groceries for tomorrow, high priority" — and I'll do it.
+          Flip to 💭 Brainstorm mode to just ramble about your day and I'll
+          help you turn it into a plan, then put it on the board when
+          you're ready.
         </div>
       </div>
       <div id="chat-error" class="chat-error" hidden></div>
