@@ -1,0 +1,59 @@
+name: Deploy to Render
+
+# Push-to-deploy: every push to this branch redeploys the Render service.
+# No-ops politely if setup hasn't run yet or the secret is missing.
+
+on:
+  push:
+    branches:
+      - main
+      - claude/multimodal-task-agent-1q2u8l
+
+concurrency: render-deploy
+
+env:
+  SERVICE_NAME: whats-next
+  RENDER_API: https://api.render.com/v1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger deploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$RENDER_API_KEY" ]; then
+            echo "RENDER_API_KEY secret not set yet — skipping deploy."
+            exit 0
+          fi
+          auth=(-H "Authorization: Bearer $RENDER_API_KEY" -H "Accept: application/json" -H "Content-Type: application/json")
+
+          SID=$(curl -sf "${auth[@]}" "$RENDER_API/services?name=$SERVICE_NAME&type=web_service&limit=1" | jq -r '.[0].service.id // empty')
+          if [ -z "$SID" ]; then
+            echo "Service '$SERVICE_NAME' not found — run the 'Render setup' workflow first. Skipping."
+            exit 0
+          fi
+
+          BRANCH=$(curl -sf "${auth[@]}" "$RENDER_API/services/$SID" | jq -r '.branch')
+          if [ "$BRANCH" != "$GITHUB_REF_NAME" ]; then
+            echo "Service tracks '$BRANCH', this push is '$GITHUB_REF_NAME' — skipping."
+            exit 0
+          fi
+
+          URL=$(curl -sf "${auth[@]}" "$RENDER_API/services/$SID" | jq -r '.serviceDetails.url')
+          curl -sf "${auth[@]}" -X POST "$RENDER_API/services/$SID/deploys" -d '{}' > /dev/null
+          echo "Deploy triggered for $URL"
+
+          for i in $(seq 1 40); do
+            sleep 15
+            STATUS=$(curl -sf "${auth[@]}" "$RENDER_API/services/$SID/deploys?limit=1" | jq -r '.[0].deploy.status')
+            echo "deploy status: $STATUS"
+            case "$STATUS" in
+              live) echo "DEPLOY LIVE: $URL"; exit 0 ;;
+              build_failed|update_failed|deactivated|canceled)
+                echo "::error::Deploy ended with status: $STATUS"; exit 1 ;;
+            esac
+          done
+          echo "::warning::Timed out waiting; check the Render dashboard."
